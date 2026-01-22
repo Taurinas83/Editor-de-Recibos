@@ -10,19 +10,26 @@ export interface DocumentData {
   receiptNumber: string;
   date: string;
   client: string;
+  serviceDetails?: string; // New field for service description/details
   budgetLink: string;
   services: ServiceItem[];
   signature: string;
   signatureImage?: string;
+  currency: 'BRL' | 'USD' | 'EUR';
+  exchangeRate: number;
   paymentDetails: {
     beneficiary: string;
     bankName: string;
-    bankCode: string;
-    accountType: string;
-    agency: string;
-    accountNumber: string;
-    pixKey: string;
+    bankAddress?: string; // New: For Int'l banks
+    bankCode?: string; // BRL specific
+    accountType?: string;
+    agency?: string; // BRL specific
+    accountNumber?: string; // BRL and USD
+    iban?: string; // EUR specific
+    swift?: string; // Int'l specific
+    routingNumber?: string; // USD specific
+    pixKey?: string; // BRL specific
     paymentLink: string;
-    qrCodeUrl: string;
+    qrCodeUrl?: string; // BRL specific
   };
 }

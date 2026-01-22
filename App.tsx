@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { DEFAULT_DOC_DATA, COLORS } from './constants';
+import { DEFAULT_DOC_DATA, COLORS, PAYMENT_PROFILES } from './constants';
 import ReceiptDocument from './components/ReceiptDocument';
 import { DocumentData, ServiceItem } from './types';
 
@@ -23,12 +23,64 @@ const TrashIcon = () => (
 
 const App: React.FC = () => {
   const [docData, setDocData] = useState<DocumentData>(DEFAULT_DOC_DATA);
+  const [loadingRate, setLoadingRate] = useState(false);
+
+  // Handle Currency Changes: Exchange Rate & Payment Details
+  useEffect(() => {
+    // 1. Switch Payment Profile based on Currency
+    const newPaymentDetails = PAYMENT_PROFILES[docData.currency as keyof typeof PAYMENT_PROFILES];
+    
+    // 2. Handle Exchange Rate
+    if (docData.currency === 'BRL') {
+      setDocData(prev => ({ 
+        ...prev, 
+        paymentDetails: { ...prev.paymentDetails, ...newPaymentDetails },
+        exchangeRate: 1 
+      }));
+      return;
+    }
+
+    const fetchRate = async () => {
+      setLoadingRate(true);
+      try {
+        const pair = `${docData.currency}-BRL`;
+        const response = await fetch(`https://economia.awesomeapi.com.br/json/last/${pair}`);
+        const data = await response.json();
+        const key = `${docData.currency}BRL`;
+        if (data[key]) {
+          const rate = parseFloat(data[key].bid);
+          setDocData(prev => ({ 
+            ...prev, 
+            paymentDetails: { ...prev.paymentDetails, ...newPaymentDetails },
+            exchangeRate: rate 
+          }));
+        } else {
+             // Fallback if API fails but we still need to switch profile
+             setDocData(prev => ({ 
+                ...prev, 
+                paymentDetails: { ...prev.paymentDetails, ...newPaymentDetails }
+              }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch exchange rate", error);
+        // Fallback: switch profile anyway
+        setDocData(prev => ({ 
+            ...prev, 
+            paymentDetails: { ...prev.paymentDetails, ...newPaymentDetails }
+        }));
+      } finally {
+        setLoadingRate(false);
+      }
+    };
+
+    fetchRate();
+  }, [docData.currency]);
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleFieldChange = (field: keyof DocumentData, value: string) => {
+  const handleFieldChange = (field: keyof DocumentData, value: string | number) => {
     setDocData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -181,6 +233,47 @@ const App: React.FC = () => {
               </div>
             </section>
 
+             {/* Currency Section - NEW */}
+            <section className="space-y-4">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center">
+                <span className="w-2 h-2 rounded-full mr-2 bg-blue-500"></span>
+                Moeda e Conversão
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                   <label className="text-[10px] font-bold text-slate-500 uppercase">Moeda Base (Entrada)</label>
+                   <select 
+                      value={docData.currency}
+                      onChange={(e) => handleFieldChange('currency', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                   >
+                     <option value="BRL">Real (BRL)</option>
+                     <option value="USD">Dólar (USD)</option>
+                     <option value="EUR">Euro (EUR)</option>
+                   </select>
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                     Taxa de Câmbio
+                     {loadingRate && <span className="animate-spin text-purple-600">↻</span>}
+                   </label>
+                   <input
+                      type="number"
+                      step="0.0001"
+                      value={docData.exchangeRate}
+                      onChange={(e) => handleFieldChange('exchangeRate', parseFloat(e.target.value) || 1)}
+                      disabled={docData.currency === 'BRL'}
+                      className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-200 ${docData.currency === 'BRL' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                   />
+                </div>
+              </div>
+              {docData.currency !== 'BRL' && (
+                <p className="text-[10px] text-slate-400 italic">
+                  * A taxa é atualizada automaticamente para a cotação atual. Você pode ajustá-la manualmente se precisar de uma taxa histórica específica para a data do orçamento.
+                </p>
+              )}
+            </section>
+
             {/* Client Section */}
             <section className="space-y-4">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center">
@@ -195,6 +288,16 @@ const App: React.FC = () => {
                   onChange={(e) => handleFieldChange('client', e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all"
                   placeholder="Ex: Nome da Empresa / CNPJ"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Detalhes do Serviço (Título)</label>
+                <input
+                  type="text"
+                  value={docData.serviceDetails || ''}
+                  onChange={(e) => handleFieldChange('serviceDetails', e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all"
+                  placeholder="Ex: Consultoria em Marketing Digital"
                 />
               </div>
             </section>
@@ -231,7 +334,7 @@ const App: React.FC = () => {
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center">
                   <span className="w-2 h-2 rounded-full mr-2 bg-yellow-500"></span>
-                  Itens do Serviço
+                  Itens do Serviço ({docData.currency})
                 </h3>
                 <button 
                   onClick={addService}
@@ -273,7 +376,7 @@ const App: React.FC = () => {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase">Preço Unit. (R$)</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase">Preço Unit. ({docData.currency})</label>
                         <input
                           type="number"
                           value={service.price}

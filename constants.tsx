@@ -8,15 +8,8 @@ export const COLORS = {
   accent4: '#26EBEB',
 };
 
-export const DEFAULT_DOC_DATA = {
-  companyName: 'PREDMED Portimão',
-  receiptNumber: '20251222-001',
-  date: '22 de Dezembro de 2025',
-  client: 'Paulo e Sara',
-  budgetLink: 'https://sites.google.com/view/proposta-prontmed/proposta',
-  signature: 'Tiago Taurian Design',
-  signatureImage: '',
-  paymentDetails: {
+export const PAYMENT_PROFILES = {
+  BRL: {
     beneficiary: 'TIAGO TAURIAN VIANA',
     bankName: 'Wise Brasil Instituição de Pagamento Ltda.',
     bankCode: '40571694',
@@ -25,8 +18,43 @@ export const DEFAULT_DOC_DATA = {
     accountNumber: '36651195',
     pixKey: '361477ef-a092-4062-97c6-333ff7fcfbaa',
     paymentLink: 'https://wise.com/pay/me/tiagot1047',
-    qrCodeUrl: 'https://i.imgur.com/u9LskSc.png', // Converted to direct image link for rendering
+    qrCodeUrl: 'https://i.imgur.com/u9LskSc.png',
   },
+  USD: {
+    beneficiary: 'Tiago Taurian Viana',
+    bankName: 'Wise US Inc',
+    bankAddress: '108 W 13th St, Wilmington, DE, 19801, United States',
+    accountType: 'Deposit',
+    accountNumber: '447046528729505',
+    routingNumber: '084009519',
+    swift: 'TRWIUS35XXX',
+    paymentLink: 'https://wise.com/pay/me/tiagot1047',
+    qrCodeUrl: '', // No standard QR code for US transfers usually
+  },
+  EUR: {
+    beneficiary: 'Tiago Taurian Viana',
+    bankName: 'Wise',
+    bankAddress: 'Rue du Trône 100, 3rd floor, Brussels, 1050, Belgium',
+    iban: 'BE75 9675 2764 0051',
+    swift: 'TRWIBEB1XXX',
+    accountType: 'Current Account',
+    paymentLink: 'https://wise.com/pay/me/tiagot1047',
+    qrCodeUrl: '',
+  }
+};
+
+export const DEFAULT_DOC_DATA = {
+  companyName: 'PREDMED Portimão',
+  receiptNumber: '20251222-001',
+  date: '22 de Dezembro de 2025',
+  client: 'Paulo e Sara',
+  serviceDetails: 'Criação de Identidade Visual e Materiais Gráficos',
+  budgetLink: 'https://sites.google.com/view/proposta-prontmed/proposta',
+  signature: 'Tiago Taurian Design',
+  signatureImage: '',
+  currency: 'BRL',
+  exchangeRate: 1,
+  paymentDetails: PAYMENT_PROFILES.BRL,
   services: [
     { description: 'Assinaturas de Email', quantity: 6, price: 35.00 },
     { description: 'Arte de cartão de Visitas', quantity: 1, price: 60.00 },

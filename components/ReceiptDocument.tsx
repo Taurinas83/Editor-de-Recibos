@@ -15,7 +15,13 @@ const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({ data }) => {
   }, [data.signatureImage]);
 
   const calculateTotal = () => {
-    return data.services.reduce((acc, item) => acc + (item.quantity * item.price), 0);
+    // Total is calculated in the base currency (e.g. USD) then converted to BRL
+    const subtotal = data.services.reduce((acc, item) => acc + (item.quantity * item.price), 0);
+    return subtotal * (data.exchangeRate || 1);
+  };
+
+  const getConvertedPrice = (price: number) => {
+    return price * (data.exchangeRate || 1);
   };
 
   const formatImageUrl = (url: string | undefined) => {
@@ -60,7 +66,14 @@ const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({ data }) => {
       <div className="grid grid-cols-2 gap-8 mb-12 border-b border-gray-100 pb-12">
         <div>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Cliente</h3>
-          <p className="text-xl font-semibold text-gray-800">{data.client}</p>
+          <p className="text-xl font-semibold text-gray-800 mb-4">{data.client}</p>
+          
+          {data.serviceDetails && (
+             <div className="mt-6">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Referente à</h3>
+                <p className="text-base font-medium text-gray-700 leading-snug">{data.serviceDetails}</p>
+             </div>
+          )}
         </div>
         <div className="text-right">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Data de Emissão</h3>
@@ -75,29 +88,46 @@ const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({ data }) => {
             <tr className="border-b-2" style={{ borderColor: COLORS.accent4 }}>
               <th className="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Descrição</th>
               <th className="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Qtd</th>
-              <th className="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Unitário</th>
-              <th className="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Subtotal</th>
+              <th className="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Unitário {data.currency !== 'BRL' ? '(R$)' : ''}</th>
+              <th className="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Subtotal {data.currency !== 'BRL' ? '(R$)' : ''}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {data.services.map((item, idx) => (
-              <tr key={idx}>
-                <td className="py-4">
-                  <span className="font-semibold text-gray-800 block">{item.description}</span>
-                </td>
-                <td className="py-4 text-center font-medium text-gray-600">{item.quantity}</td>
-                <td className="py-4 text-right font-medium text-gray-800">
-                  R$ {item.price.toFixed(2).replace('.', ',')}
-                </td>
-                <td className="py-4 text-right font-bold text-gray-800">
-                  R$ {(item.quantity * item.price).toFixed(2).replace('.', ',')}
-                </td>
-              </tr>
-            ))}
+            {data.services.map((item, idx) => {
+              const unitPriceBRL = getConvertedPrice(item.price);
+              const subtotalBRL = getConvertedPrice(item.price * item.quantity);
+              
+              return (
+                <tr key={idx}>
+                  <td className="py-4">
+                    <span className="font-semibold text-gray-800 block">{item.description}</span>
+                  </td>
+                  <td className="py-4 text-center font-medium text-gray-600">{item.quantity}</td>
+                  <td className="py-4 text-right font-medium text-gray-800">
+                    R$ {unitPriceBRL.toFixed(2).replace('.', ',')}
+                    {data.currency !== 'BRL' && (
+                        <span className="block text-[9px] text-gray-400">
+                            ({item.price.toFixed(2)} {data.currency})
+                        </span>
+                    )}
+                  </td>
+                  <td className="py-4 text-right font-bold text-gray-800">
+                    R$ {subtotalBRL.toFixed(2).replace('.', ',')}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t-2" style={{ borderColor: COLORS.accent4 }}>
-              <td colSpan={3} className="py-6 text-right font-bold text-gray-400 uppercase tracking-widest text-sm">Valor Total Bruto</td>
+              <td colSpan={3} className="py-6 text-right">
+                <p className="font-bold text-gray-400 uppercase tracking-widest text-sm">Valor Total Bruto</p>
+                {data.currency !== 'BRL' && (
+                    <p className="text-[10px] text-gray-400 mt-1">
+                        Conversão: 1 {data.currency} = {data.exchangeRate.toFixed(4).replace('.', ',')} BRL
+                    </p>
+                )}
+              </td>
               <td className="py-6 text-right text-2xl font-black" style={{ color: COLORS.primary }}>
                 R$ {totalValue.toFixed(2).replace('.', ',')}
               </td>
@@ -119,30 +149,72 @@ const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({ data }) => {
             <div>
               <h3 className="text-sm font-bold uppercase tracking-widest mb-6 flex items-center" style={{ color: COLORS.primary }}>
                 <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: COLORS.accent3 }}></span>
-                Dados Bancários (Wise / Pix)
+                Dados Bancários ({data.currency === 'BRL' ? 'Pix/Transferência' : 'Wise International'})
               </h3>
+              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-4">
                 <div className="col-span-2">
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Beneficiário</p>
                   <p className="text-sm font-bold text-gray-800">{data.paymentDetails.beneficiary}</p>
                 </div>
+
                 <div className="col-span-2">
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Banco / Instituição</p>
                   <p className="text-sm font-semibold text-gray-800">{data.paymentDetails.bankName}</p>
-                  <p className="text-[10px] text-gray-500 font-medium">Cód. Banco: {data.paymentDetails.bankCode}</p>
+                  {data.paymentDetails.bankCode && (
+                    <p className="text-[10px] text-gray-500 font-medium">Cód. Banco: {data.paymentDetails.bankCode}</p>
+                  )}
+                  {data.paymentDetails.bankAddress && (
+                     <p className="text-[10px] text-gray-500 font-medium mt-0.5">{data.paymentDetails.bankAddress}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Agência / Conta</p>
-                  <p className="text-sm font-mono font-semibold text-gray-800">Ag. {data.paymentDetails.agency}</p>
-                  <p className="text-sm font-mono font-semibold text-gray-800">CC. {data.paymentDetails.accountNumber}</p>
-                  <p className="text-[10px] text-gray-500 font-medium mt-1">{data.paymentDetails.accountType}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Chave Pix (Aleatória)</p>
-                  <p className="text-xs font-mono font-bold text-gray-800 break-all bg-gray-100 p-2 rounded border border-gray-200">
-                    {data.paymentDetails.pixKey}
-                  </p>
-                </div>
+
+                {/* Conditional Fields based on Available Data */}
+                {data.paymentDetails.agency && (
+                    <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Agência / Conta</p>
+                    <p className="text-sm font-mono font-semibold text-gray-800">Ag. {data.paymentDetails.agency}</p>
+                    <p className="text-sm font-mono font-semibold text-gray-800">CC. {data.paymentDetails.accountNumber}</p>
+                    </div>
+                )}
+                
+                {/* For USD/Intl without Agency but with Account Number */}
+                {!data.paymentDetails.agency && data.paymentDetails.accountNumber && (
+                    <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Conta ({data.paymentDetails.accountType || 'Conta'})</p>
+                    <p className="text-sm font-mono font-semibold text-gray-800">{data.paymentDetails.accountNumber}</p>
+                    </div>
+                )}
+
+                {data.paymentDetails.routingNumber && (
+                     <div>
+                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Routing Number (ACH/Wire)</p>
+                     <p className="text-sm font-mono font-semibold text-gray-800">{data.paymentDetails.routingNumber}</p>
+                     </div>
+                )}
+
+                {data.paymentDetails.iban && (
+                     <div className="col-span-2">
+                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">IBAN</p>
+                     <p className="text-sm font-mono font-semibold text-gray-800 break-all">{data.paymentDetails.iban}</p>
+                     </div>
+                )}
+
+                {data.paymentDetails.swift && (
+                     <div>
+                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">SWIFT / BIC</p>
+                     <p className="text-sm font-mono font-semibold text-gray-800">{data.paymentDetails.swift}</p>
+                     </div>
+                )}
+
+                {data.paymentDetails.pixKey && (
+                    <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Chave Pix</p>
+                    <p className="text-xs font-mono font-bold text-gray-800 break-all bg-gray-100 p-2 rounded border border-gray-200">
+                        {data.paymentDetails.pixKey}
+                    </p>
+                    </div>
+                )}
               </div>
             </div>
 
@@ -168,16 +240,22 @@ const ReceiptDocument: React.FC<ReceiptDocumentProps> = ({ data }) => {
                 <p className="text-[10px] text-gray-400 mt-2 uppercase font-medium">Isento de impostos retidos</p>
             </div>
             
-            <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center flex-grow">
-                 {data.paymentDetails.qrCodeUrl && (
-                     <img 
+            {/* Only show QR Code box if URL exists (usually only for BRL) */}
+            {data.paymentDetails.qrCodeUrl ? (
+                <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center flex-grow">
+                    <img 
                         src={data.paymentDetails.qrCodeUrl} 
                         alt="QR Code Pix" 
                         className="w-32 h-32 object-contain mix-blend-multiply mb-2"
-                     />
-                 )}
-                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Escaneie para Pagar</p>
-            </div>
+                    />
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Escaneie para Pagar</p>
+                </div>
+            ) : (
+                <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center flex-grow">
+                     <p className="text-xs font-bold text-gray-400 text-center">Transferência Internacional</p>
+                     <p className="text-[10px] text-gray-300 text-center mt-1">Use os dados ao lado para realizar a transferência via Wise ou SWIFT.</p>
+                </div>
+            )}
           </div>
         </div>
       </div>
